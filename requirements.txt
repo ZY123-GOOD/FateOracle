@@ -1,0 +1,15 @@
+# 八字分析工具依赖
+# 安装命令: pip install -r requirements.txt
+
+# 核心依赖（无外部依赖，纯Python实现）
+# 无
+
+# 可选依赖 - 农历转换
+zhdate>=0.1
+
+# 可选依赖 - API调用
+openai>=1.0.0
+python-dotenv>=1.0.0  # .env文件加载
+streamlit>=1.30.0
+# 开发依赖
+# pytest>=7.0.0  # 测试框架（可选）
