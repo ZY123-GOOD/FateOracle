@@ -1,5 +1,7 @@
 # 🔮 Bazi Analysis System
 
+[![Chinese Version](https://img.shields.io/badge/中文版-README--cn.md-blue)](README-cn.md)
+
 A professional Chinese Astrology (BaZi) analysis web application built with Streamlit.
 
 ## ✨ Features

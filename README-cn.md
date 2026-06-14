@@ -1,5 +1,7 @@
 # 🔮 八字分析系统
 
+[![English Version](https://img.shields.io/badge/English-README.md-blue)](README.md)
+
 基于 Streamlit 构建的八字命理分析 Web 应用。
 
 ## ✨ 功能特性
