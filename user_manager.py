@@ -72,6 +72,22 @@ class UserManager:
             )
         ''')
         
+        # 自动创建管理员账号（如果不存在）
+        admin_id = "admin_root"
+        admin_username = "ROOT"
+        admin_password = "123456"
+        admin_password_hash = self._hash_password(admin_password)
+        admin_email = "admin@bazi.local"
+        
+        # 检查管理员账号是否存在
+        cursor.execute('SELECT id FROM users WHERE username = ?', (admin_username,))
+        if not cursor.fetchone():
+            cursor.execute('''
+                INSERT INTO users (id, username, password, email, credits)
+                VALUES (?, ?, ?, ?, 1000)
+            ''', (admin_id, admin_username, admin_password_hash, admin_email))
+            print(f"[INFO] 已自动创建管理员账号: {admin_username}")
+        
         conn.commit()
         conn.close()
     
