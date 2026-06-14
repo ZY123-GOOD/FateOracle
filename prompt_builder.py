@@ -103,6 +103,60 @@ class BaziPromptBuilder:
 4. 语言通俗易懂，避免玄奥术语
 5. 保持客观中立，不做绝对断言"""
 
+    # 八字相合分析模板
+    COMPATIBILITY_TEMPLATE = """请分析以下两人的八字相合度：
+
+【关系类型】
+{relationship_type}
+
+【甲方信息】
+出生时间：{my_birth_time}
+性别：{my_gender}
+八字：{my_year_zhu} {my_month_zhu} {my_day_zhu} {my_hour_zhu}
+日主：{my_day_gan}（{my_day_wuxing}）
+
+【乙方信息】
+出生时间：{other_birth_time}
+性别：{other_gender}
+八字：{other_year_zhu} {other_month_zhu} {other_day_zhu} {other_hour_zhu}
+日主：{other_day_gan}（{other_day_wuxing}）
+
+请从以下几个方面分析两人的相合度：
+1. **五行互补**：分析两人五行是否互补或冲突
+2. **日干关系**：两人日干的十神关系（如正缘、比肩等）
+3. **地支关系**：六合、三合、相冲等关系分析
+4. **性格契合**：基于十神配置分析性格匹配度
+5. **相处建议**：相处中需要注意的方面
+6. **综合评分**：给出相合度评分（满分100分）和建议"""
+
+    # 八字相合问答模板
+    COMPATIBILITY_QA_TEMPLATE = """用户问题：{question}
+
+【关系类型】
+{relationship_type}
+
+【甲方信息】
+出生时间：{my_birth_time}
+性别：{my_gender}
+八字：{my_year_zhu} {my_month_zhu} {my_day_zhu} {my_hour_zhu}
+日主：{my_day_gan}（{my_day_wuxing}）
+
+【乙方信息】
+出生时间：{other_birth_time}
+性别：{other_gender}
+八字：{other_year_zhu} {other_month_zhu} {other_day_zhu} {other_hour_zhu}
+日主：{other_day_gan}（{other_day_wuxing}）
+
+当前年份：{current_year}年
+
+{conversation_history}
+请基于以上两人的八字信息和对话历史，回答用户关于两人关系的问题。回答要：
+1. 结合命理理论，给出专业分析
+2. 注意与前面的对话上下文关联，保持回答的连贯性
+3. 提供具体、有针对性的建议
+4. 语言通俗易懂，避免玄奥术语
+5. 保持客观中立，不做绝对断言"""
+
     def __init__(self):
         pass
 
@@ -235,6 +289,92 @@ class BaziPromptBuilder:
             day_gan=bazi_result["日干"],
             day_wuxing=self._get_wuxing(bazi_result["日干"]),
             current_dayun=current_dayun["大运"] if current_dayun else "未起运",
+            current_year=current_year,
+            conversation_history=history_str
+        )
+
+        return prompt
+
+    def build_compatibility_prompt(self, my_bazi: Dict, other_bazi: Dict,
+                                    relationship_type: str) -> str:
+        """
+        构建八字相合分析prompt
+
+        Args:
+            my_bazi: 我的八字排盘结果
+            other_bazi: 对方的八字排盘结果
+            relationship_type: 关系类型
+
+        Returns:
+            格式化后的prompt
+        """
+        prompt = self.COMPATIBILITY_TEMPLATE.format(
+            relationship_type=relationship_type,
+            my_birth_time=my_bazi["出生时间"],
+            my_gender=my_bazi["性别"],
+            my_year_zhu=my_bazi["年柱"],
+            my_month_zhu=my_bazi["月柱"],
+            my_day_zhu=my_bazi["日柱"],
+            my_hour_zhu=my_bazi["时柱"],
+            my_day_gan=my_bazi["日干"],
+            my_day_wuxing=self._get_wuxing(my_bazi["日干"]),
+            other_birth_time=other_bazi["出生时间"],
+            other_gender=other_bazi["性别"],
+            other_year_zhu=other_bazi["年柱"],
+            other_month_zhu=other_bazi["月柱"],
+            other_day_zhu=other_bazi["日柱"],
+            other_hour_zhu=other_bazi["时柱"],
+            other_day_gan=other_bazi["日干"],
+            other_day_wuxing=self._get_wuxing(other_bazi["日干"])
+        )
+
+        return prompt
+
+    def build_compatibility_qa_prompt(self, my_bazi: Dict, other_bazi: Dict,
+                                       relationship_type: str, question: str,
+                                       current_year: int = None,
+                                       conversation_history: List[Dict] = None) -> str:
+        """
+        构建八字相合问答prompt
+
+        Args:
+            my_bazi: 我的八字排盘结果
+            other_bazi: 对方的八字排盘结果
+            relationship_type: 关系类型
+            question: 用户问题
+            current_year: 当前年份
+            conversation_history: 对话历史
+
+        Returns:
+            格式化后的prompt
+        """
+        from datetime import datetime
+
+        if current_year is None:
+            current_year = datetime.now().year
+
+        # 格式化对话历史
+        history_str = self._format_conversation_history(conversation_history)
+
+        prompt = self.COMPATIBILITY_QA_TEMPLATE.format(
+            relationship_type=relationship_type,
+            my_birth_time=my_bazi["出生时间"],
+            my_gender=my_bazi["性别"],
+            my_year_zhu=my_bazi["年柱"],
+            my_month_zhu=my_bazi["月柱"],
+            my_day_zhu=my_bazi["日柱"],
+            my_hour_zhu=my_bazi["时柱"],
+            my_day_gan=my_bazi["日干"],
+            my_day_wuxing=self._get_wuxing(my_bazi["日干"]),
+            other_birth_time=other_bazi["出生时间"],
+            other_gender=other_bazi["性别"],
+            other_year_zhu=other_bazi["年柱"],
+            other_month_zhu=other_bazi["月柱"],
+            other_day_zhu=other_bazi["日柱"],
+            other_hour_zhu=other_bazi["时柱"],
+            other_day_gan=other_bazi["日干"],
+            other_day_wuxing=self._get_wuxing(other_bazi["日干"]),
+            question=question,
             current_year=current_year,
             conversation_history=history_str
         )

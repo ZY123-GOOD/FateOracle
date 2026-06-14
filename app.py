@@ -202,6 +202,20 @@ def main():
         
         st.divider()
         
+        # 新建项目按钮
+        if st.button("➕ 新建项目", use_container_width=True, type="primary"):
+            # 清除当前排盘结果和相关状态
+            st.session_state['bazi_result'] = None
+            st.session_state['analysis_result'] = None
+            st.session_state['qa_history'] = []
+            st.session_state['current_bazi_history_id'] = None
+            st.session_state['compatibility_result'] = None
+            st.session_state['compatibility_qa_history'] = []
+            st.session_state['compatibility_other_bazi'] = None
+            st.rerun()
+        
+        st.divider()
+        
         # 历史排盘记录
         st.header("📜 排盘历史")
         
@@ -269,13 +283,16 @@ def main():
         display_bazi_result(st.session_state['bazi_result'])
         
         # 分析选项卡
-        tab1, tab2 = st.tabs(["基础分析", "命理问答"])
+        tab1, tab2, tab3 = st.tabs(["基础分析", "命理问答", "八字相合"])
         
         with tab1:
             display_basic_analysis()
         
         with tab2:
             display_qa()
+        
+        with tab3:
+            display_compatibility()
     else:
         # 显示出生信息输入表单
         display_birth_info_form()
@@ -347,7 +364,7 @@ def display_birth_info_form():
                     # 保存到历史记录（如果已登录）
                     if is_logged_in():
                         bazi_result_json = json.dumps(result, ensure_ascii=False)
-                        st.session_state['user_manager'].save_bazi_result(
+                        history_id = st.session_state['user_manager'].save_bazi_result(
                             st.session_state['current_user']['id'],
                             result['出生时间'],
                             gender,
@@ -355,6 +372,8 @@ def display_birth_info_form():
                             bazi_result_json,
                             None
                         )
+                        # 保存记录ID，用于后续关联分析结果和问答
+                        st.session_state['current_bazi_history_id'] = history_id
                     
                     st.success("排盘成功！")
                     st.rerun()
@@ -491,12 +510,8 @@ def display_basic_analysis():
                                     
                                     # 保存分析结果到历史记录
                                     if is_logged_in() and st.session_state['current_bazi_history_id']:
-                                        st.session_state['user_manager'].save_bazi_result(
-                                            st.session_state['current_user']['id'],
-                                            st.session_state['bazi_result']['出生时间'],
-                                            st.session_state['bazi_result']['性别'],
-                                            st.session_state['bazi_result']['出生地'],
-                                            json.dumps(st.session_state['bazi_result'], ensure_ascii=False),
+                                        st.session_state['user_manager'].update_bazi_result(
+                                            st.session_state['current_bazi_history_id'],
                                             result['分析结果']
                                         )
                                     
@@ -663,6 +678,225 @@ def display_qa():
                     st.warning("请输入问题")
         else:
             st.warning("⚠️ 未配置API Key，无法进行AI问答")
+
+
+def display_compatibility():
+    """八字相合分析 - 分析两人关系"""
+    st.subheader("🔗 八字相合分析")
+    
+    # 检查登录状态
+    if not is_logged_in():
+        st.warning("⚠️ 请先登录以使用八字相合功能")
+        st.info("💡 新用户注册即送10次问答机会")
+        return
+    
+    # 检查剩余次数
+    credits = get_remaining_credits()
+    st.caption(f"💬 账户剩余次数: {credits}次")
+    
+    if credits <= 0:
+        st.warning("⚠️ 您的问答次数已用完")
+        return
+    
+    # 显示己方信息（从排盘结果中获取）
+    st.markdown("### 📋 您的信息")
+    my_info = st.session_state['bazi_result']
+    st.write(f"**出生时间**: {my_info['出生时间']}")
+    st.write(f"**性别**: {my_info['性别']}")
+    st.write(f"**出生地**: {my_info['出生地']}")
+    st.write(f"**八字**: {my_info['四柱']['年柱']['干']}{my_info['四柱']['年柱']['支']} "
+             f"{my_info['四柱']['月柱']['干']}{my_info['四柱']['月柱']['支']} "
+             f"{my_info['四柱']['日柱']['干']}{my_info['四柱']['日柱']['支']} "
+             f"{my_info['四柱']['时柱']['干']}{my_info['四柱']['时柱']['支']}")
+    
+    st.divider()
+    
+    # 输入对方信息
+    st.markdown("### 📝 对方信息")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        other_date = st.date_input(
+            "对方出生日期",
+            value=datetime.date(1990, 5, 15),
+            min_value=datetime.date(1900, 1, 1),
+            max_value=datetime.date.today(),
+            key="other_birth_date"
+        )
+        
+        other_time = st.time_input(
+            "对方出生时间",
+            value=datetime.time(10, 30),
+            key="other_birth_time"
+        )
+        
+        other_gender = st.radio(
+            "对方性别",
+            ["男", "女"],
+            index=0,
+            key="other_gender"
+        )
+    
+    with col2:
+        other_city = st.text_input(
+            "对方出生城市",
+            value="北京",
+            placeholder="例如: 北京、上海、深圳...",
+            key="other_city"
+        ).strip()
+        
+        # 验证城市是否存在
+        if other_city:
+            longitude = city_to_longitude(other_city)
+            if longitude:
+                st.success(f"✓ 已识别城市: {other_city} (经度: {longitude}°)")
+            else:
+                st.warning(f"⚠ 未找到城市 '{other_city}'，请检查名称")
+                other_city = None
+        
+        # 关系类型选择
+        relationship_type = st.selectbox(
+            "关系类型",
+            ["情侣/夫妻", "朋友", "同事/合作伙伴", "家人", "其他"],
+            key="relationship_type"
+        )
+    
+    # 初始化相合分析状态
+    if 'compatibility_result' not in st.session_state:
+        st.session_state['compatibility_result'] = None
+    
+    if 'compatibility_qa_history' not in st.session_state:
+        st.session_state['compatibility_qa_history'] = []
+    
+    # 开始分析按钮
+    if st.button("🔮 开始分析", type="primary"):
+        if not other_city:
+            st.warning("请先输入对方出生城市")
+        else:
+            # 消耗次数
+            if consume_credit('compatibility'):
+                with st.spinner("正在分析两人八字相合度..."):
+                    try:
+                        # 计算对方八字
+                        other_bazi = BaziCore(city=other_city)
+                        other_result = other_bazi.solar_to_bazi(
+                            other_date.year,
+                            other_date.month,
+                            other_date.day,
+                            other_time.hour,
+                            other_time.minute,
+                            other_gender
+                        )
+                        
+                        # 调用AI分析
+                        service = BaziAnalysisService(api_config=get_api_config())
+                        result = service.analyze_compatibility(
+                            my_bazi=my_info,
+                            other_bazi=other_result,
+                            relationship_type=relationship_type
+                        )
+                        
+                        st.session_state['compatibility_result'] = result
+                        st.session_state['compatibility_other_bazi'] = other_result
+                        st.session_state['compatibility_qa_history'] = []
+                        
+                        st.success(f"✓ 分析完成，剩余次数: {get_remaining_credits()}次")
+                        
+                    except Exception as e:
+                        st.error(f"分析失败: {e}")
+                        # 恢复次数
+                        st.session_state['user_manager'].add_credits(
+                            st.session_state['current_user']['id'], 1
+                        )
+            else:
+                st.error("无法消耗次数，请重试")
+    
+    # 显示分析结果
+    if st.session_state['compatibility_result']:
+        st.divider()
+        st.markdown("### 📊 相合度分析")
+        
+        # 显示对方八字
+        other_info = st.session_state['compatibility_other_bazi']
+        st.write(f"**对方八字**: {other_info['四柱']['年柱']['干']}{other_info['四柱']['年柱']['支']} "
+                 f"{other_info['四柱']['月柱']['干']}{other_info['四柱']['月柱']['支']} "
+                 f"{other_info['四柱']['日柱']['干']}{other_info['四柱']['日柱']['支']} "
+                 f"{other_info['四柱']['时柱']['干']}{other_info['四柱']['时柱']['支']}")
+        
+        st.write(st.session_state['compatibility_result']['分析结果'])
+        
+        # 问答功能
+        st.divider()
+        st.markdown("### ❓ 关系问答")
+        
+        MAX_COMPAT_QA = 10
+        
+        # 检查对话上限
+        if len(st.session_state['compatibility_qa_history']) >= MAX_COMPAT_QA:
+            st.warning(f"⚠️ 已达到{MAX_COMPAT_QA}轮对话上限")
+            for qa in st.session_state['compatibility_qa_history']:
+                st.markdown(f"**问：** {qa['question']}")
+                st.markdown(f"**答：** {qa['answer']}")
+                st.divider()
+            return
+        
+        st.caption(f"本轮对话: {len(st.session_state['compatibility_qa_history']) + 1}/{MAX_COMPAT_QA}")
+        
+        # 显示问答历史
+        for qa in st.session_state['compatibility_qa_history'][:-1]:
+            st.markdown(f"**问：** {qa['question']}")
+            st.markdown(f"**答：** {qa['answer']}")
+            st.divider()
+        
+        # 最后一个问答（如果有）
+        if st.session_state['compatibility_qa_history']:
+            last_qa = st.session_state['compatibility_qa_history'][-1]
+            st.markdown(f"**问：** {last_qa['question']}")
+            st.markdown(f"**答：** {last_qa['answer']}")
+            st.divider()
+        
+        # 新问题输入
+        new_question = st.text_area(
+            "请输入您关于两人关系的问题",
+            placeholder="例如：我们适合在一起吗？相处中需要注意什么？",
+            key=f"compat_question_{len(st.session_state['compatibility_qa_history'])}"
+        )
+        
+        if has_api_key():
+            if st.button("🔮 解答", key=f"compat_ask_btn_{len(st.session_state['compatibility_qa_history'])}"):
+                if new_question.strip():
+                    # 消耗次数
+                    if consume_credit('compatibility'):
+                        with st.spinner("正在解答..."):
+                            try:
+                                service = BaziAnalysisService(api_config=get_api_config())
+                                result = service.ask_compatibility_question(
+                                    my_bazi=my_info,
+                                    other_bazi=st.session_state['compatibility_other_bazi'],
+                                    relationship_type=relationship_type,
+                                    question=new_question,
+                                    conversation_history=st.session_state['compatibility_qa_history']
+                                )
+                                
+                                st.session_state['compatibility_qa_history'].append({
+                                    'question': new_question,
+                                    'answer': result['回答']
+                                })
+                                
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"分析失败: {e}")
+                                # 恢复次数
+                                st.session_state['user_manager'].add_credits(
+                                    st.session_state['current_user']['id'], 1
+                                )
+                    else:
+                        st.error("无法消耗次数，请重试")
+                else:
+                    st.warning("请输入问题")
+        else:
+            st.warning("⚠️ 未配置API Key")
 
 
 if __name__ == "__main__":

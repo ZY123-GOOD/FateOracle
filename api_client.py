@@ -154,6 +154,61 @@ class BaziAnalyzer:
 
         return self._call_api(system_prompt, user_prompt)
 
+    def analyze_compatibility(self, my_bazi: Dict, other_bazi: Dict,
+                              relationship_type: str) -> Dict:
+        """
+        分析两人八字相合度
+
+        Args:
+            my_bazi: 我的八字排盘结果
+            other_bazi: 对方的八字排盘结果
+            relationship_type: 关系类型（情侣/夫妻、朋友、同事、家人等）
+
+        Returns:
+            相合度分析结果
+        """
+        system_prompt = self.prompt_builder.get_system_prompt()
+        user_prompt = self.prompt_builder.build_compatibility_prompt(
+            my_bazi, other_bazi, relationship_type
+        )
+
+        result = self._call_api(system_prompt, user_prompt)
+
+        return {
+            "分析结果": result
+        }
+
+    def ask_compatibility_question(self, my_bazi: Dict, other_bazi: Dict,
+                                    relationship_type: str, question: str,
+                                    conversation_history: List[Dict] = None) -> Dict:
+        """
+        回答关于两人关系的问题（支持上下文记忆）
+
+        Args:
+            my_bazi: 我的八字排盘结果
+            other_bazi: 对方的八字排盘结果
+            relationship_type: 关系类型
+            question: 用户问题
+            conversation_history: 对话历史
+
+        Returns:
+            回答结果
+        """
+        from datetime import datetime
+        current_year = datetime.now().year
+
+        system_prompt = self.prompt_builder.get_system_prompt()
+        user_prompt = self.prompt_builder.build_compatibility_qa_prompt(
+            my_bazi, other_bazi, relationship_type, question,
+            current_year, conversation_history
+        )
+
+        result = self._call_api(system_prompt, user_prompt)
+
+        return {
+            "回答": result
+        }
+
     def _call_api(self, system_prompt: str, user_prompt: str,
                   retry_count: int = 2) -> str:
         """
@@ -354,6 +409,48 @@ class BaziAnalysisService:
             "排盘结果": bazi_result,
             "回答": answer
         }
+
+    def analyze_compatibility(self, my_bazi: Dict, other_bazi: Dict,
+                              relationship_type: str) -> Dict:
+        """
+        分析两人八字相合度
+
+        Args:
+            my_bazi: 我的八字排盘结果
+            other_bazi: 对方的八字排盘结果
+            relationship_type: 关系类型（情侣/夫妻、朋友、同事、家人等）
+
+        Returns:
+            相合度分析结果
+        """
+        analyzer = self._init_analyzer()
+        result = analyzer.analyze_compatibility(my_bazi, other_bazi, relationship_type)
+
+        return result
+
+    def ask_compatibility_question(self, my_bazi: Dict, other_bazi: Dict,
+                                    relationship_type: str, question: str,
+                                    conversation_history: List[Dict] = None) -> Dict:
+        """
+        回答关于两人关系的问题（支持上下文记忆）
+
+        Args:
+            my_bazi: 我的八字排盘结果
+            other_bazi: 对方的八字排盘结果
+            relationship_type: 关系类型
+            question: 用户问题
+            conversation_history: 对话历史
+
+        Returns:
+            回答结果
+        """
+        analyzer = self._init_analyzer()
+        result = analyzer.ask_compatibility_question(
+            my_bazi, other_bazi, relationship_type, question,
+            conversation_history=conversation_history
+        )
+
+        return result
 
 
 # ========== 配置文件示例 ==========

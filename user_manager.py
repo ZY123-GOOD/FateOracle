@@ -328,6 +328,31 @@ class UserManager:
         conn.close()
         return results
     
+    def update_bazi_result(self, bazi_history_id: int, analysis_result: str) -> bool:
+        """
+        更新排盘记录的分析结果
+        
+        Args:
+            bazi_history_id: 排盘记录ID
+            analysis_result: AI分析结果
+        
+        Returns:
+            是否成功
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE bazi_history 
+            SET analysis_result = ? 
+            WHERE id = ?
+        ''', (analysis_result, bazi_history_id))
+        
+        affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return affected > 0
+    
     def delete_bazi_history(self, user_id: str, history_id: int) -> bool:
         """删除排盘历史记录"""
         conn = sqlite3.connect(self.db_path)
